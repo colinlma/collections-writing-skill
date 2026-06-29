@@ -10,12 +10,11 @@ For each URL, the skill runs an 8-step process:
 
 1. **Skip logic** — leaves already-written rows alone, preserves and expands existing copy.
 2. **Primary keyword** — takes the topic from the keyword, not the (often misleading) URL slug.
-3. **Crawl** — fetches the live page with the bundled Playwright script to capture real product names, materials, and construction details.
+3. **Crawl the PLP, then its PDPs** — fetches the collection page, extracts its product links, then crawls each product page to build a per-page verification corpus (real product names, composition, construction details). This two-level crawl is what makes the copy verifiable.
 4. **Write** — produces `<h2>` + `<p>` HTML copy in brand voice, leads each paragraph with a citable standalone claim, goes deep on 2–3 products, weaves in 3–4 internal links as absolute URLs.
 5. **Voice check** — catches hype, corporate speak, exclamation marks, em-dash asides, third-person distancing.
-6. **Fact check** — every product name and spec is verified verbatim against the crawl data.
-7. **Verifiability audit** — a structured pass that flags any claim not backed by a product's page (the classic failure mode: extrapolating one product's feature onto a sibling that doesn't have it).
-8. **Format + write to CSV** — valid HTML, word count, link count, and flags written back to the sheet.
+6. **Verifiability loop (validate → fix → re-validate)** — a deterministic verifier (`verify_claims.py`) plus per-piece validator and fixer subagents check every spec, material, and product name against the PDP corpus and rewrite anything unsupported. The loop runs until two consecutive clean passes (max 3 rounds); unresolved claims are flagged for human review, never invented around.
+7. **Format + write to CSV** — valid HTML, word count, link count, and audit flags written back to the sheet.
 
 It avoids anything that goes stale — product counts, prices, size ranges, length measurements — by rule.
 
@@ -23,9 +22,10 @@ It avoids anything that goes stale — product counts, prices, size ranges, leng
 
 ```
 skills/ecommerce-plp-copy/
-├── SKILL.md                  # the skill definition + full 8-step process
+├── SKILL.md                  # the skill definition + full process
 └── scripts/
-    └── crawl_page.py         # Playwright crawler: fetches a page's rendered text
+    ├── crawl_page.py         # Playwright crawler: rendered text + (--links) all page links
+    └── verify_claims.py      # deterministic claim verifier against the PDP corpus
 ```
 
 ## Install
@@ -64,17 +64,29 @@ python3 -m playwright install chromium
 2. **Brand voice guideline** (optional but recommended) — tone, words to avoid, words to prefer, good/bad examples. The richer it is, the better the output.
 3. **Parameters** (or use defaults) — word count (200–300), internal links per page (3–4), max sentences per paragraph (3).
 
-## Using the crawler directly
+## Using the scripts directly
 
-The crawler works on its own:
+**Crawl a page** (rendered text). Add `--links` to also dump every anchor href — use it on a collection page to discover the product (PDP) URLs to crawl next:
 
 ```bash
+# PLP: text + all links
 python3 skills/ecommerce-plp-copy/scripts/crawl_page.py \
-  "https://example.com/collections/some-category" \
-  output.txt
+  "https://example.com/collections/some-category" plp.txt --links plp.links.json
+
+# PDP: text only
+python3 skills/ecommerce-plp-copy/scripts/crawl_page.py \
+  "https://example.com/products/some-product" pdp.txt
 ```
 
-It launches headless Chromium with a real-browser user agent, waits for the page to render, and writes the visible text to `output.txt`.
+It launches headless Chromium with a real-browser user agent, waits for the page to render, and writes the visible text to the output file.
+
+**Verify copy claims** against the corpus you build from the PDP crawls:
+
+```bash
+python3 skills/ecommerce-plp-copy/scripts/verify_claims.py corpus.json copy.json --output findings.json
+```
+
+`verify_claims.py` flags numeric specs, materials, and construction terms that appear in the copy but not in any product page for that collection. Its default patterns are apparel-oriented — pass `--patterns patterns.txt` for other verticals.
 
 ## Output
 

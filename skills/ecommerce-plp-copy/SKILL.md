@@ -87,22 +87,43 @@ Before doing any work on a URL, check:
 
 Extract the primary keyword from the Keywords column. The main topic of the copy should come from this keyword, not the URL slug — URL slugs are often unoptimized and misleading. If the keyword says "mens hybrid shorts" but the URL slug says "elastic-waist-walkshorts", write about mens hybrid shorts.
 
-### Step 2: Crawl the Page
+### Step 2: Crawl the Page (PLP, then its PDPs)
 
-Use the bundled crawl script at `scripts/crawl_page.py` to fetch the page content:
+Factual grounding needs two levels of crawl: the **PLP** for the product list, and each product's **PDP** for the verbatim details (composition, construction, full names) that the copy — and the Step 5b verifiability loop — check against. Skipping the PDP crawl is the single most common cause of unverifiable copy.
+
+**Step 2a — Crawl the PLP and capture its product links.**
 
 ```bash
-python3 scripts/crawl_page.py "https://example.com/collections/page" "/tmp/crawl_output.txt"
+python3 scripts/crawl_page.py "https://example.com/collections/page" "/tmp/plp.txt" --links "/tmp/plp.links.json"
 ```
 
-Read the crawl output to understand:
-- What products are actually on the page (names, types, styles)
-- What product attributes are available (colors, materials, construction features, fit styles)
-- Any filters or categories shown
+`--links` writes every anchor href on the page. Filter that list to the **PDP URLs** — the links whose path matches the site's product pattern (`/products/` on Shopify; other platforms use `/product/`, `/p/`, `/dp/`, `/item/`). Dedupe them.
 
-Note: the crawl data will contain prices, size options, and product counts. Use these only to understand the page — never write them into the copy. Prices, sizes, and counts all change frequently and make copy go stale.
+Read the PLP text to understand what products are on the page (names, types, styles) and which attributes show on the grid.
 
-This step prevents the most common failure in ecommerce copy: making claims about products that aren't there. If the page shows 3 products all in the same style, the copy should reflect that narrow selection rather than implying a wide range.
+**Step 2b — Crawl each PDP and build the verification corpus.**
+
+Crawl each PDP URL from Step 2a (up to 5 in parallel — see Batch Processing). For large PLPs, crawl a representative sample (e.g. the first 15–25 products plus any you intend to name), and record the cap in the flags.
+
+```bash
+python3 scripts/crawl_page.py "https://example.com/products/some-product" "/tmp/pdp_01.txt" &
+# ...launch up to 5 at a time, then:
+wait
+```
+
+Assemble a **verification corpus** keyed by PLP slug — this is the input to `verify_claims.py` in Step 5b:
+
+```json
+{ "<plp-slug>": { "names": ["Full Verbatim Product Name", ...], "text": "all PDP descriptions + features concatenated" } }
+```
+
+`names` = the PLP titles plus each PDP's H1; `text` = the concatenated PDP descriptions and feature lists.
+
+**Never write prices, size options, or product counts into the copy.** The crawl contains them, but they go stale. Use them only to understand the page.
+
+This two-level crawl prevents the most common failure in ecommerce copy: claiming products or features that aren't there, or extrapolating one product's feature onto a sibling whose PDP never claims it. If the page shows 3 products in the same style, the copy should reflect that narrow selection, not imply a wide range.
+
+**When to skip the PDP crawl.** Sale, gift, branded, or hub PLPs that don't list category-matched inventory can be crawled "names only" (PLP only). When you skip PDPs, the copy must avoid specific per-product claims, and the Step 5b loop marks those pieces `names-only` instead of verifying them.
 
 ### Step 3: Write the Copy
 
@@ -199,42 +220,50 @@ Compare every claim in the copy against what you found on the page:
 
 Flag anything you can't verify. It's better to be vague ("several styles") than confidently wrong ("twelve colorways in every fit").
 
-### Step 5b: Programmatic Verifiability Audit
+### Step 5b: Verifiability Loop (validate → fix → re-validate)
 
-After writing all the copy, run a structured audit before delivery. This catches claims you wrote on autopilot that aren't backed by the crawl. Failure mode this prevents: extrapolating a feature from one PDP to a sister product whose PDP doesn't claim it.
+Step 5 is your own read-back. Step 5b is an adversarial, automated loop that runs after all copy is drafted and does not stop until the copy is clean. It kills the failure mode where a claim you wrote on autopilot isn't backed by any PDP. **Run it with subagents so each piece is checked by something other than the writer that produced it** — the writer is the worst auditor of its own claims.
 
-For each piece, extract:
+**Inputs:** the verification corpus from Step 2b, the drafted copy (one object per PLP: `{"slug","copy"}`), and — for non-apparel verticals — a `--patterns` file for `verify_claims.py`.
 
-1. **Named products** (regex for capitalized product-name patterns). Check each against the source PLP product list and the per-product PDP names. If the name in copy isn't a verbatim or clean substring/superstring of a real product name, flag it. Common cause: editorial shortening ("4/3mm Thermal Sealed Chest-Zip Wetsuit" → "Thermal Wetsuit"). Use the full name.
+**The loop, per round:**
 
-2. **High-risk specific claims** — patterns to extract:
-   - Numerical specs (`4/3mm`, `5mm`, `180g cotton`, `4-way stretch`, `20" boardshorts`)
-   - Material names from the PDP vocabulary (`graphene-infused`, `SMART Foam`, `Pro Stretch`, `Superflex neoprene`, `Silicone Stretch`, `Smooth Skin`, `partially recycled polyester`)
-   - Construction terms (`GBS seams`, `fully welded seams`, `flatlock seams`, `bonded waistband`, `hidden split toe`, `chest zip`, `back zip`)
-   - Named features (`lower leg patch pocket`, `back patch pocket`, `hammer loop`, `adjustable arch strap`, `adjustable drawcord`, `fixed waist`)
-   - Fit terms (`regular fit`, `OG fit`, `core fit`, `performance fit`, `slim straight`)
-   - Fabric finishes (`garment-washed`, `peached cotton twill`, `wave-washed`, `salt-washed`)
+1. **Deterministic pre-pass.** Run the backbone verifier:
+   ```bash
+   python3 scripts/verify_claims.py corpus.json copy.json --output findings.json
+   ```
+   It flags numeric specs, materials, construction terms, and finishes that appear in the copy but **not** in that PLP's corpus, and marks any slug with no corpus as `NO_CORPUS`. The default patterns are apparel-oriented — pass `--patterns` for other verticals.
 
-3. **For each extracted claim**, check whether the (normalized) phrase appears in the PDP intro or features list of any product on the source page. If not, the claim is unverified — flag the source slug and the claim.
+2. **Validator subagents (one per piece, in parallel).** Give each the piece's copy, its corpus (`names` + `text`), and the pre-pass findings for that slug. The validator confirms the script's findings and adds the semantic checks a regex can't make:
+   - **Product names** — every named product is a verbatim match (or clean sub/superstring) of a real corpus name. Shortened names are findings.
+   - **Over-claims** — "available in short and long sleeve" when only one exists; "all products have UPF 50" when only some do.
+   - **Sub-category sweeps** — "our hoodies are made of X" needs at least one hoodie PDP that backs it.
+   - **Empty inventory** — if the corpus has 0 usable products for this slug, flag the page itself; don't write around it.
+   Return structured findings: `{slug, unverified_claims, unverified_names, overclaims, notes, verdict: clean|issues}`.
 
-4. **Sub-category sweep claims** ("our hoodies are made of...") need at least one PDP in the source whose features back the claim. If no hoodie PDP supports it, flag.
+3. **Fixer subagents (only for pieces with findings).** Give each the copy, its findings, and its corpus. The fixer rewrites **only the flagged spans**:
+   - Replace a shortened name with the verbatim PDP name.
+   - Replace a generic descriptor with the corpus's specific value ("cotton-rich" → "100% Cotton", **only if the PDP says so**).
+   - Soften an over-claim to what's supported ("many of our [type]"), or cut it.
+   - **Remove any claim the corpus cannot support. Never invent a replacement** — if it isn't in the corpus, it does not go in the copy. This is the universal fact-pass rule and it overrides any urge to keep a sentence pretty.
+   Everything not flagged is left unchanged.
 
-5. **Empty inventory check.** If the source's PDP crawl returned 0 products with usable descriptions (e.g., the PLP shows cross-product picks instead of category-matched inventory), flag the page itself: "PLP HAS NO MATCHING INVENTORY — copy describes intended category but live page does not actually list products of this type." Don't silently write copy as if the inventory exists.
+4. **Re-validate.** Re-run step 1 (and the validator for any piece the fixer touched) on the updated copy.
 
-**Output a per-piece findings line** that goes either into a tracking column ("Verifiability Audit") or into a separate audit file. Format:
+**Stop condition:** loop until a round produces **zero findings across all pieces two rounds in a row**, or after **3 rounds**, whichever comes first. If a piece still has findings after 3 rounds, stop fixing it and surface it in the output flags for human review — don't let the loop spin or the fixer get creative.
 
-- Fully verified: `All N product names + M specific claims verified.`
-- Issues: `UNVERIFIED PRODUCT NAMES: [list]. UNVERIFIED CLAIMS (N): [tag: claim, claim; tag: claim].`
-- Inventory issue: `PLP HAS NO MATCHING INVENTORY: [explanation].`
+**Output a per-piece audit line** into the tracking column ("Verifiability Audit") or a separate `audit_findings.json`:
+- Verified: `All N product names + M specific claims verified.`
+- Resolved: `Fixed in K rounds: [what changed].`
+- Unresolved: `NEEDS REVIEW: [claim] — not supported by any PDP after 3 rounds.`
+- Inventory: `PLP HAS NO MATCHING INVENTORY: [explanation].`
+- Names-only: `[Names-only: PDP crawl skipped for this page type] — no per-product claims made.`
 
-Reference approach: build a verification corpus per source from PDP descriptions + features + PLP product names, normalize hyphens and punctuation, then walk each high-risk claim pattern against it. Make it re-runnable and output findings to `audit_findings.json`.
-
-**Common audit findings to expect (and what they tell you):**
-
-- `Cotton-rich`, `cotton-blend` flagged → you wrote a generic descriptor instead of pulling the specific composition from the PDP ("100% Cotton" or "98% Cotton, 2% Elastane"). Fix: use the verbatim composition.
-- `Garment-washed` flagged on a piece → you extrapolated from a sister PDP. Fix: only mention if it's in this product's PDP.
-- Shortened product names flagged → use the verbatim PDP h1.
-- `[Names-only audit: no PDP crawl for this source]` → the source was deliberately not deep-dived (sale/gift/branded/hub), so claims about specific products on those pages can't be verified from local data. Acceptable when the page type warranted skipping the PDP crawl.
+**What a finding tells you:**
+- `cotton-rich` / `cotton-blend` flagged → generic descriptor instead of the PDP's exact composition. Use the verbatim composition ("100% Cotton", "98% Cotton, 2% Elastane").
+- `garment-washed` flagged on a piece → extrapolated from a sibling PDP. State it only if this product's PDP says so.
+- Shortened product name flagged → use the verbatim PDP H1.
+- `NO_CORPUS` → the page was crawled names-only, or the PDP crawl failed. Either crawl its PDPs or keep the copy free of per-product claims.
 
 ### Step 6: Format as HTML
 
@@ -255,7 +284,7 @@ Place the finished copy in the Reworked Copy column and update metadata columns:
 
 For efficiency, process URLs in batches:
 
-1. **Crawl in parallel** — run up to 5 Playwright crawls simultaneously using bash background processes. Wait for all to complete before writing copy.
+1. **Crawl in parallel** — run up to 5 Playwright crawls simultaneously using bash background processes, for both the PLP crawls (Step 2a) and the PDP crawls (Step 2b). Wait for all to complete before writing copy. Build each PLP's verification corpus from its PDP crawls before drafting.
 2. **Write copy sequentially** — each piece needs the full CSV context to pick the right internal links, so write one at a time.
 3. **Save after each batch** — don't wait until all URLs are done. Save the CSV after every 5–7 URLs so progress isn't lost.
 4. **Report progress** — after each batch, show the user a summary table: URL slug, word count, link count, any flags.
