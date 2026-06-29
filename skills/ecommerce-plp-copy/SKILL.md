@@ -224,7 +224,7 @@ Flag anything you can't verify. It's better to be vague ("several styles") than 
 
 Step 5 is your own read-back. Step 5b is an adversarial, automated loop that runs after all copy is drafted and does not stop until the copy is clean. It kills the failure mode where a claim you wrote on autopilot isn't backed by any PDP. **Run it with subagents so each piece is checked by something other than the writer that produced it** — the writer is the worst auditor of its own claims.
 
-**Inputs:** the verification corpus from Step 2b, the drafted copy (one object per PLP: `{"slug","copy"}`), and — for non-apparel verticals — a `--patterns` file for `verify_claims.py`.
+**Inputs:** the verification corpus from Step 2b, the drafted copy (one object per PLP: `{"slug","copy"}`), and optionally a `--patterns` file of domain-specific terms for `verify_claims.py`.
 
 **The loop, per round:**
 
@@ -232,7 +232,7 @@ Step 5 is your own read-back. Step 5b is an adversarial, automated loop that run
    ```bash
    python3 scripts/verify_claims.py corpus.json copy.json --output findings.json
    ```
-   It flags numeric specs, materials, construction terms, and finishes that appear in the copy but **not** in that PLP's corpus, and marks any slug with no corpus as `NO_CORPUS`. The default patterns are apparel-oriented — pass `--patterns` for other verticals.
+   It is vertical-agnostic: it extracts numeric specs, hyphenated descriptors, and acronyms from the copy and flags any that appear **nowhere** in that PLP's corpus, and marks any slug with no corpus as `NO_CORPUS`. No per-vertical setup is required; use `--patterns` only to add domain-specific multiword terms it can't infer (e.g. "GBS seams", "single origin"). See `scripts/patterns.example.txt`.
 
 2. **Validator subagents (one per piece, in parallel).** Give each the piece's copy, its corpus (`names` + `text`), and the pre-pass findings for that slug. The validator confirms the script's findings and adds the semantic checks a regex can't make:
    - **Product names** — every named product is a verbatim match (or clean sub/superstring) of a real corpus name. Shortened names are findings.

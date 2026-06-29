@@ -1,0 +1,28 @@
+# Optional extra claim signals for verify_claims.py
+#
+# The script already extracts numeric specs, hyphenated descriptors, and acronyms
+# for ANY vertical. Use this file only to add domain-specific MULTIWORD terms it
+# can't infer on its own (e.g. lowercase technical phrases with no hyphen/number).
+#
+# Format: one per line.
+#   - a line starting with "re:" is a regex
+#   - any other line is a literal phrase (matched case-insensitively)
+#
+# Apparel examples:
+GBS seams
+flatlock seams
+chest zip
+regular fit
+slim straight
+peached cotton
+#
+# Food / grocery examples:
+single origin
+grass fed
+cold brew
+re:\d+\s?calories
+#
+# Electronics examples:
+active noise cancellation
+optical zoom
+re:ip\d{2}\b

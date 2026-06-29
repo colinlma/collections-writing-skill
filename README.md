@@ -24,8 +24,9 @@ It avoids anything that goes stale — product counts, prices, size ranges, leng
 skills/ecommerce-plp-copy/
 ├── SKILL.md                  # the skill definition + full process
 └── scripts/
-    ├── crawl_page.py         # Playwright crawler: rendered text + (--links) all page links
-    └── verify_claims.py      # deterministic claim verifier against the PDP corpus
+    ├── crawl_page.py          # Playwright crawler: rendered text + (--links) all page links
+    ├── verify_claims.py       # vertical-agnostic claim verifier against the PDP corpus
+    └── patterns.example.txt   # optional domain-specific claim terms for --patterns
 ```
 
 ## Install
@@ -86,7 +87,7 @@ It launches headless Chromium with a real-browser user agent, waits for the page
 python3 skills/ecommerce-plp-copy/scripts/verify_claims.py corpus.json copy.json --output findings.json
 ```
 
-`verify_claims.py` flags numeric specs, materials, and construction terms that appear in the copy but not in any product page for that collection. Its default patterns are apparel-oriented — pass `--patterns patterns.txt` for other verticals.
+`verify_claims.py` flags any specific, checkable claim in the copy that appears in no product page for that collection. It's **vertical-agnostic** — it extracts numeric specs (`40-hour`, `256gb`, `98% cotton`), hyphenated descriptors (`water-resistant`, `cold-pressed`), and acronyms (`LED`, `USB`, `GBS`) generically, so it works for apparel, electronics, food, or anything else with no setup. Use `--patterns` only to add domain-specific multiword terms it can't infer (see `scripts/patterns.example.txt`).
 
 ## Output
 
