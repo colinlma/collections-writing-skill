@@ -14,7 +14,8 @@ For each URL, the skill runs an 8-step process:
 4. **Write** — produces `<h2>` + `<p>` HTML copy in brand voice, leads each paragraph with a citable standalone claim, goes deep on 2–3 products, weaves in 3–4 internal links as absolute URLs.
 5. **Voice check** — catches hype, corporate speak, exclamation marks, em-dash asides, third-person distancing.
 6. **Verifiability loop (validate → fix → re-validate)** — a deterministic verifier (`verify_claims.py`) plus per-piece validator and fixer subagents check every spec, material, and product name against the PDP corpus and rewrite anything unsupported. The loop runs until two consecutive clean passes (max 3 rounds); unresolved claims are flagged for human review, never invented around.
-7. **Format + write to CSV** — valid HTML, word count, link count, and audit flags written back to the sheet.
+7. **Link-placement loop (detect → fix → re-check)** — a deterministic checker (`check_link_placement.py`) plus QA and fixer subagents enforce *contextual* linking: links sit on the category words already in the prose, spread across paragraphs, never dumped into a closing "Browse X, Y, and Z" sentence or hidden behind generic anchors like "shop now". The fixer only repositions links — it never touches a factual claim.
+8. **Format + write to CSV** — valid HTML, word count, link count, and audit flags written back to the sheet.
 
 It avoids anything that goes stale — product counts, prices, size ranges, length measurements — by rule.
 
@@ -24,9 +25,10 @@ It avoids anything that goes stale — product counts, prices, size ranges, leng
 skills/ecommerce-plp-copy/
 ├── SKILL.md                  # the skill definition + full process
 └── scripts/
-    ├── crawl_page.py          # Playwright crawler: rendered text + (--links) all page links
-    ├── verify_claims.py       # vertical-agnostic claim verifier against the PDP corpus
-    └── patterns.example.txt   # optional domain-specific claim terms for --patterns
+    ├── crawl_page.py            # Playwright crawler: rendered text + (--links) all page links
+    ├── verify_claims.py         # vertical-agnostic claim verifier against the PDP corpus
+    ├── check_link_placement.py  # flags link dumps, stacked/clustered links, generic anchors
+    └── patterns.example.txt     # optional domain-specific claim terms for --patterns
 ```
 
 ## Install
@@ -88,6 +90,14 @@ python3 skills/ecommerce-plp-copy/scripts/verify_claims.py corpus.json copy.json
 ```
 
 `verify_claims.py` flags any specific, checkable claim in the copy that appears in no product page for that collection. It's **vertical-agnostic** — it extracts numeric specs (`40-hour`, `256gb`, `98% cotton`), hyphenated descriptors (`water-resistant`, `cold-pressed`), and acronyms (`LED`, `USB`, `GBS`) generically, so it works for apparel, electronics, food, or anything else with no setup. Use `--patterns` only to add domain-specific multiword terms it can't infer (see `scripts/patterns.example.txt`).
+
+**Check link placement** — flags closing-link dumps, links stacked into one sentence, clustered links, and generic anchor text:
+
+```bash
+python3 skills/ecommerce-plp-copy/scripts/check_link_placement.py copy.json --output link_findings.json
+```
+
+`copy.json` is a JSON array of `{"slug","copy"}`. The checker handles the objective placement problems; a QA subagent then judges whether each anchor sits on a naturally-occurring word (see Step 5c in `SKILL.md`).
 
 ## Output
 

@@ -146,9 +146,24 @@ Good: "Our men's boardshorts combine quick-dry stretch fabric with outseam lengt
 - **Sub-category sweep is allowed.** When several products share an attribute (e.g. all hoodies in the drop are made from the same heavyweight fleece), one general statement covers the group: "Our hoodies are sized for cooler mornings and post-surf coverage." This avoids repetition and keeps word count down.
 - Name specific product lines, styles, or key features that appear in the crawl data. Concrete names (like "the Tidewater Hybrid Short" or "the Ridgeline Pullover") are more useful to shoppers than vague descriptions. **Use the verbatim product name from the PDP.** Don't shorten ("4/3mm Thermal Sealed Chest-Zip Wetsuit" → "Thermal Wetsuit") — the shortened version isn't the actual product name and won't verify against crawl data.
 - Include factual details: fabric types, fit styles (e.g., straight, scallop, regular), construction features. **Pull these verbatim from the PDP** ("4-way stretch", "GBS seams", "180g cotton"). Don't substitute generic descriptors like "cotton-rich" or "garment-washed" unless those exact phrases appear in the source PDP.
-- End with a natural transition to related categories via internal links.
+- Close with a real sentence, not a link list. A closing transition to a related category is fine, but carry it on prose with at most one inline link (see "Contextual linking is the default" below).
 
-**Vary internal link placement.** Don't dump all 3–4 links in the closing paragraph — that reads as a footer dump. Place at least one link mid-paragraph where it fits the sentence naturally, and let the closing paragraph carry one or two transitional links. A good model: one link at the end of paragraph 2 (mid-copy), and two or three transitional links in the closing sentence.
+**Contextual linking is the default — link on words the copy already uses.** The single most common linking failure is stacking every link into a closing "Browse X, Y, and Z" sentence. That reads as a footer nav dump, not editorial copy, and it wastes the anchor text: the words a shopper (and a search engine) care about — *boardshorts*, *swim*, *dresses*, *trucker hat*, *wetsuits* — are usually already sitting in the body, unlinked, while a generic "browse our range" carries the link at the bottom.
+
+So write the copy first, then go back and find the category nouns you already wrote and turn *those* into the links, spread across the paragraphs. Anchor text should be the natural phrase as it reads in the sentence (`<a href="...collections/mens-clothing-boardshorts">boardshorts</a>`), lowercase, not a Title-Case label or a generic "shop now."
+
+Only place a link in the closing sentence when a target has no natural anchor anywhere in the body — and never stack two or more links into that closing sentence. If the only way to fit a target is a closing link list, cut the target instead; a link nobody would click from context isn't worth the dump.
+
+**Worked example (a women's swim collection):**
+Before — links clustered in a closing dump:
+> ...The Sunset Cover-Up handles the walk back.
+> Pull the look together from <a>women's swim</a>, add breezy pieces from <a>women's dresses</a>, or carry it all in a tote from <a>women's bags and totes</a>.
+
+After — same three targets, moved onto words already in the copy, spread across the piece:
+> It runs across <a href="...collections/womens-swim">swim</a>, <a href="...collections/womens-dresses">dresses</a>, tops, pants, cover-ups, and accessories... *(paragraph 1)*
+> ...The Sunset Cover-Up handles the walk back, and a roomy <a href="...collections/womens-bags-totes">tote</a> carries the rest. *(closing prose, one inline link)*
+
+The closing sentence is now prose with at most one inline link, and every link sits on a word the reader was already reading.
 
 **Phrasing to avoid as paragraph openers:**
 - "For carry, see..." / "For wear, see..." / "For X, see..." — these are awkward telegraphic intros that read as catalog navigation rather than editorial copy. Open with a complete sentence about the products or use case, then weave the link inline. Example: instead of "For carry, see backpacks where the smaller crossbody and waistbag options sit alongside the bigger totes," write "Backpacks, crossbody bags, and waistbags round out the carry side, sized to wash sand off and keep going."
@@ -265,6 +280,44 @@ Step 5 is your own read-back. Step 5b is an adversarial, automated loop that run
 - Shortened product name flagged → use the verbatim PDP H1.
 - `NO_CORPUS` → the page was crawled names-only, or the PDP crawl failed. Either crawl its PDPs or keep the copy free of per-product claims.
 
+### Step 5c: Link Placement QA Loop (detect → fix → re-check)
+
+Step 5b guards *what* the copy claims. Step 5c guards *how it links*. Writers — even good ones — drift back to the closing-link-dump habit under batch pressure, because piling the links at the end is the path of least resistance. This loop catches that drift mechanically and fixes it, the same validate→fix→re-validate shape as 5b, and **the fixer must be a different agent than the writer** — the writer that produced a dump is the least likely to see it as one.
+
+**Inputs:** the drafted copy (one object per PLP: `{"slug","copy"}`) and the link-target list.
+
+**The loop, per round:**
+
+1. **Deterministic pre-pass.** Run the placement checker:
+   ```bash
+   python3 scripts/check_link_placement.py copy.json --output link_findings.json
+   ```
+   It parses each piece's HTML and flags the objective placement problems a regex can catch:
+   - **closing dump** — the final `<p>` holds 3+ links (a two-link closing spread across separate prose sentences is *allowed* — short category pages often have few other natural anchor spots);
+   - **stacked in one sentence** — 3+ links crammed into a single sentence (the explicit "Browse A, B, and C" list). Two links in one sentence is left for the QA reader in step 2 — it's usually natural prose ("it runs across *swim*, *dresses*, and tops"), so the deterministic layer stays high-precision and only fires on 3+;
+   - **clustered** — every link in the piece lives in a single paragraph;
+   - **generic anchor** — anchor text is a non-descriptive connector ("shop now", "click here", "here", "browse", "this page", "learn more", "see more", "shop", "view");
+   - **link count** — fewer than 2 or more than 4 links;
+   - **orphaned closing** — the closing paragraph is *almost entirely* links with no real prose around them.
+   It does **not** judge whether an anchor sits on a naturally-occurring word — that needs a reader, which is step 2.
+
+2. **QA subagents (one per flagged piece, in parallel).** Give each the piece's copy, its `check_link_placement.py` findings, and the link-target list. The QA agent confirms the script's findings and adds the judgment a regex can't make:
+   - **natural-anchor check** — for each link, is the anchor text a phrase that already belongs in the sentence, or is it bolted-on nav language? A link on "boardshorts" inside a sentence about boardshorts passes; "check out our <a>boardshorts</a> collection for more" tacked onto the end does not.
+   - **missed inline opportunities** — does the body already contain a category noun (unlinked) that matches a link target sitting in the closing dump? That's the exact fix: move the link onto the word.
+   Return: `{slug, verdict: clean|issues, closing_dump: bool, generic_anchors: [...], move_suggestions: [{target, from:"closing", to:"the word '<x>' in paragraph N"}], notes}`.
+
+3. **Fixer subagents (only for pieces with findings).** Give each the copy, its findings, and the target list. The fixer **repositions links only** — it must not touch product names, features, or any factual claim (those already passed 5b):
+   - Move a dumped link onto the naturally-occurring word the QA agent identified.
+   - Rewrite a closing "Browse X, Y, and Z" sentence into prose, relocating its links inline earlier; if that strands the closing sentence, give it a short real closing line (subject + finite verb, no fragment).
+   - Replace a generic anchor with the category phrase it points to.
+   - Keep 2–4 links, gender-matched, valid slugs. If a target has no natural home, drop it rather than dump it.
+
+4. **Re-check.** Re-run step 1 (and the QA agent for any piece the fixer touched) on the updated copy.
+
+**Stop condition:** loop until a round produces zero placement findings across all pieces, or after **3 rounds**. Surface any piece still flagged after 3 rounds in the output for human review rather than letting the fixer get creative.
+
+**A caution on rewriting.** This loop moves links; it does not rewrite prose. Watch the fixer for scope creep — if a "fix" changes a product claim or invents a sentence, that's a regression, not a fix. The visible-text word count should barely move except where a genuine dump sentence was deleted. A quick guard: compare each fixed piece's visible-text word count to its pre-fix count; a swing beyond ~15 words on a piece that only had a placement finding means the fixer rewrote copy it shouldn't have — revert and re-run just that piece.
+
 ### Step 6: Format as HTML
 
 Ensure the copy is valid HTML:
@@ -306,7 +359,7 @@ For each page, select the 3–4 most semantically related URLs from the CSV:
 3. **Complementary products** — items typically bought or used together (boardshorts + rashguards, snow pants + snow jackets)
 4. **Sale pages** — if there's a sale version of this category, consider linking to it
 
-Weave links naturally into the copy. Don't dump them all in the last paragraph — though ending with 1–2 links to related pages is fine as a natural transition.
+Weave links onto words the copy already uses, spread across the paragraphs — see "Contextual linking is the default" in Step 3 for the full rule and worked example, and Step 5c for the QA loop that enforces it. The short version: link the category noun where it naturally appears in the body, not a generic phrase at the bottom; the closing sentence should be prose with at most one inline link.
 
 ## Output
 
