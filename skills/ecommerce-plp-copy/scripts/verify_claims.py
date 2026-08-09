@@ -2,10 +2,18 @@
 """
 Deterministic claim verifier for PLP copy. Vertical-agnostic.
 
-Builds a normalized verification corpus from the PDP crawls of a PLP, then checks
-each piece of copy for high-risk factual claims that do NOT appear anywhere in
-that PLP's corpus. Anything not found is flagged as UNVERIFIED — it is either a
-hallucination or a feature extrapolated from a sibling product's PDP.
+Builds a normalized verification corpus from the PDP crawls of a PLP, then runs
+two checks that point in opposite directions:
+
+  UNVERIFIED     — a high-risk factual claim that appears NOWHERE in that PLP's
+                   corpus. Either a hallucination or a feature extrapolated from
+                   a sibling product's PDP.
+  NAMED_PRODUCTS — a product/style/SKU name from the corpus that DOES appear in
+                   the copy. Step 3 of the skill bans naming individual products,
+                   so here a perfect match is the violation: presence is the
+                   finding, not accuracy. Matched on the colorway-stripped style
+                   name, whole-phrase. Proprietary material and feature names are
+                   not product names and are not flagged.
 
 It does NOT rely on a per-vertical vocabulary list. Instead it extracts the kinds
 of tokens that ARE specific, checkable claims in any product category, then
@@ -23,8 +31,9 @@ verifies each against the corpus:
 
 This is the deterministic backbone of the validate -> fix loop. It errs toward
 flagging candidates; a validator subagent prunes false positives and adds the
-semantic checks a regex can't make (product-name accuracy, over-claims like
-"short and long sleeve", sub-category sweeps, empty inventory).
+semantic checks a regex can't make (names split across a clause or reused as a
+common noun, over-claims like "short and long sleeve", group statements backed by
+only a subset of the products they cover, empty inventory).
 
 For domain-specific multiword terms a regex won't catch on its own ("GBS seams",
 "regular fit", "grain-fed", "single-origin"), add them with --patterns (see
@@ -104,6 +113,33 @@ def strip_html(html: str) -> str:
     return re.sub(r"<[^>]+>", " ", html)
 
 
+COLORWAY_SUFFIX_RE = re.compile(r"\s+-\s+[^-]{2,30}$")
+
+
+def style_name(name: str) -> str:
+    """Corpus title with any trailing ' - <Color>' colorway removed."""
+    return COLORWAY_SUFFIX_RE.sub("", name).strip()
+
+
+def find_named_products(copy_html: str, names):
+    """Product names present in the copy. Presence is the finding, not accuracy.
+
+    Step 3 bans naming individual products, so this is the inverse of the claim
+    check: a name that matches the corpus perfectly is still a violation. Matches
+    on the colorway-stripped style name, whole-phrase, case-insensitive.
+    """
+    norm = normalize(strip_html(copy_html))
+    hits = set()
+    for raw in names:
+        for candidate in {raw, style_name(raw)}:
+            c = normalize(candidate).strip()
+            if len(c) < 3:
+                continue
+            if re.search(rf"(?<![\w']){re.escape(c)}(?![\w'])", norm):
+                hits.add(candidate.strip())
+    return sorted(hits)
+
+
 def load_extra_patterns(path):
     regexes, phrases = [], []
     if not path:
@@ -173,7 +209,7 @@ def main():
     findings = []
     for piece in pieces:
         slug = piece.get("slug", "")
-        rec = {"slug": slug, "unverified_claims": [], "status": ""}
+        rec = {"slug": slug, "unverified_claims": [], "named_products": [], "status": ""}
 
         if slug not in norm_corpus:
             rec["status"] = "NO_CORPUS"
@@ -188,26 +224,45 @@ def main():
                 continue
             rec["unverified_claims"].append(claim)
 
-        rec["status"] = "CLEAN" if not rec["unverified_claims"] else "UNVERIFIED"
+        rec["named_products"] = find_named_products(
+            piece.get("copy", ""), corpus[slug].get("names", [])
+        )
+
+        if rec["named_products"] and rec["unverified_claims"]:
+            rec["status"] = "ISSUES"
+        elif rec["named_products"]:
+            rec["status"] = "NAMED_PRODUCTS"
+        elif rec["unverified_claims"]:
+            rec["status"] = "UNVERIFIED"
+        else:
+            rec["status"] = "CLEAN"
         findings.append(rec)
 
     if args.output:
         json.dump(findings, open(args.output, "w", encoding="utf-8"), indent=2)
 
     total_unverified = sum(len(f["unverified_claims"]) for f in findings)
+    total_named = sum(len(f["named_products"]) for f in findings)
     clean = sum(1 for f in findings if f["status"] == "CLEAN")
     no_corpus = sum(1 for f in findings if f["status"] == "NO_CORPUS")
+    with_named = sum(1 for f in findings if f["named_products"])
+    with_unver = sum(1 for f in findings if f["unverified_claims"])
     print("Verify Claims Report")
     print("=" * 56)
     print(f"Pieces: {len(pieces)} | clean: {clean} | "
-          f"with unverified claims: {sum(1 for f in findings if f['status']=='UNVERIFIED')} | "
+          f"with named products: {with_named} | "
+          f"with unverified claims: {with_unver} | "
           f"no corpus: {no_corpus}")
+    print(f"Total named products (hard violations of the no-names rule): {total_named}")
     print(f"Total unverified claims (candidates for the validator to confirm): {total_unverified}")
     for f in findings:
-        if f["status"] == "UNVERIFIED":
-            print(f"  [{f['slug']}] UNVERIFIED: {', '.join(f['unverified_claims'])}")
-        elif f["status"] == "NO_CORPUS":
+        if f["status"] == "NO_CORPUS":
             print(f"  [{f['slug']}] NO CORPUS")
+            continue
+        if f["named_products"]:
+            print(f"  [{f['slug']}] NAMED PRODUCTS: {', '.join(f['named_products'])}")
+        if f["unverified_claims"]:
+            print(f"  [{f['slug']}] UNVERIFIED: {', '.join(f['unverified_claims'])}")
 
     sys.exit(0)
 

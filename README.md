@@ -10,14 +10,14 @@ For each URL, the skill runs an 8-step process:
 
 1. **Skip logic** — leaves already-written rows alone, preserves and expands existing copy.
 2. **Primary keyword** — takes the topic from the keyword, not the (often misleading) URL slug.
-3. **Crawl the PLP, then its PDPs** — fetches the collection page, extracts its product links, then crawls each product page to build a per-page verification corpus (real product names, composition, construction details). This two-level crawl is what makes the copy verifiable.
-4. **Write** — produces `<h2>` + `<p>` HTML copy in brand voice, leads each paragraph with a citable standalone claim, goes deep on 2–3 products, weaves in 3–4 internal links as absolute URLs.
+3. **Crawl the PLP, then its PDPs** — fetches the collection page, extracts its product links, then crawls each product page to build a per-page verification corpus (product names, composition, construction details). This two-level crawl is what makes the copy verifiable. The names are used to *check* the copy, not to appear in it (see step 4).
+4. **Write** — produces `<h2>` + `<p>` HTML copy in brand voice, leads each paragraph with a citable standalone claim, goes deep on 2–3 *attribute groups*, weaves in 3–4 internal links as absolute URLs. It never names an individual product: a named product goes stale the moment that style sells out or leaves the collection, so the copy speaks to the range and pulls its specificity from shared fabrics, constructions, and use cases instead.
 5. **Voice check** — catches hype, corporate speak, exclamation marks, em-dash asides, third-person distancing.
-6. **Verifiability loop (validate → fix → re-validate)** — a deterministic verifier (`verify_claims.py`) plus per-piece validator and fixer subagents check every spec, material, and product name against the PDP corpus and rewrite anything unsupported. The loop runs until two consecutive clean passes (max 3 rounds); unresolved claims are flagged for human review, never invented around.
+6. **Verifiability loop (validate → fix → re-validate)** — a deterministic verifier (`verify_claims.py`) plus per-piece validator and fixer subagents run two checks in opposite directions: every spec and material must appear in the PDP corpus, and no product name may appear in the copy at all (there, a perfect corpus match is the violation). Anything unsupported gets rewritten; a named product gets rewritten into the attribute group it belonged to. The loop runs until two consecutive clean passes (max 3 rounds); unresolved claims are flagged for human review, never invented around.
 7. **Link-placement loop (detect → fix → re-check)** — a deterministic checker (`check_link_placement.py`) plus QA and fixer subagents enforce *contextual* linking: links sit on the category words already in the prose, spread across paragraphs, never dumped into a closing "Browse X, Y, and Z" sentence or hidden behind generic anchors like "shop now". The fixer only repositions links — it never touches a factual claim.
 8. **Format + write to CSV** — valid HTML, word count, link count, and audit flags written back to the sheet.
 
-It avoids anything that goes stale — product counts, prices, size ranges, length measurements — by rule.
+It avoids anything that goes stale — product names, product counts, prices, size ranges, length measurements, fabric weights, colorways — by rule.
 
 ## What's in here
 

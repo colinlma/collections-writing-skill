@@ -85,11 +85,11 @@ Before doing any work on a URL, check:
 
 ### Step 1: Identify the Primary Keyword
 
-Extract the primary keyword from the Keywords column. The main topic of the copy should come from this keyword, not the URL slug — URL slugs are often unoptimized and misleading. If the keyword says "mens hybrid shorts" but the URL slug says "elastic-waist-walkshorts", write about mens hybrid shorts.
+Extract the primary keyword from the Keywords column. The main topic of the copy should come from this keyword, not the URL slug — URL slugs are often unoptimized and misleading. If the keyword says "mens hybrid shorts" but the URL slug says "amphibians-elastic-waist", write about mens hybrid shorts.
 
 ### Step 2: Crawl the Page (PLP, then its PDPs)
 
-Factual grounding needs two levels of crawl: the **PLP** for the product list, and each product's **PDP** for the verbatim details (composition, construction, full names) that the copy — and the Step 5b verifiability loop — check against. Skipping the PDP crawl is the single most common cause of unverifiable copy.
+Factual grounding needs two levels of crawl: the **PLP** for the product list, and each product's **PDP** for the verbatim details (composition, construction, features) that the copy — and the Step 5b verifiability loop — check against. You won't name any of these products in the copy (Step 3), but you need every one of their PDPs to know which attributes are true of the whole group and which are true of only one. Skipping the PDP crawl is the single most common cause of unverifiable copy.
 
 **Step 2a — Crawl the PLP and capture its product links.**
 
@@ -103,7 +103,7 @@ Read the PLP text to understand what products are on the page (names, types, sty
 
 **Step 2b — Crawl each PDP and build the verification corpus.**
 
-Crawl each PDP URL from Step 2a (up to 5 in parallel — see Batch Processing). For large PLPs, crawl a representative sample (e.g. the first 15–25 products plus any you intend to name), and record the cap in the flags.
+Crawl each PDP URL from Step 2a (up to 5 in parallel — see Batch Processing). For large PLPs, crawl a representative sample (e.g. the first 15–25 products), and record the cap in the flags. A sample caps how far a group claim can reach: if you crawled 20 of 60 products, you cannot say "all of our jackets are waterproof" — scope group claims to what you actually read.
 
 ```bash
 python3 scripts/crawl_page.py "https://example.com/products/some-product" "/tmp/pdp_01.txt" &
@@ -140,12 +140,22 @@ Write the copy following these principles:
 Bad: "When it comes to men's boardshorts, there are a few things to consider..."
 Good: "Our men's boardshorts combine quick-dry stretch fabric with outseam lengths built for water transitions. They go from surf to sidewalk without a change."
 
+**Never name individual products. Speak to the range generally.**
+
+This is the rule that shapes the whole piece, so apply it before anything else. Do not write a product's name, style name, or SKU into the copy — not the hero style, not the best-seller, not "the [X] Pullover." A named product is the fastest-staling thing you can put on a PLP: it sells out, gets discontinued, drops off the page in a re-merch, or moves to a different collection, and the copy is wrong the moment it does. Nobody re-audits footer copy when inventory turns.
+
+You still crawl every PDP. The PDP detail is what makes the general statements specific instead of vague — you're pulling the *attributes* out of the products rather than the names.
+
+Bad: "The Tidewater Hybrid Short pairs 4-way stretch with a scalloped hem."
+Good: "The hybrid shorts here run 4-way stretch with scalloped hems."
+
 **Content approach — depth over breadth:**
 - Lead with what makes this category distinct — what differentiates these products from adjacent categories.
-- **Pick 2–3 products to go deep on.** Each gets 1–3 sentences with real differentiating detail (fabric, fit, construction, use case) pulled directly from the PDP. Don't list ten products with one adjective each — that reads like a search result, not editorial copy.
-- **Sub-category sweep is allowed.** When several products share an attribute (e.g. all hoodies in the drop are made from the same heavyweight fleece), one general statement covers the group: "Our hoodies are sized for cooler mornings and post-surf coverage." This avoids repetition and keeps word count down.
-- Name specific product lines, styles, or key features that appear in the crawl data. Concrete names (like "the Tidewater Hybrid Short" or "the Ridgeline Pullover") are more useful to shoppers than vague descriptions. **Use the verbatim product name from the PDP.** Don't shorten ("4/3mm Thermal Sealed Chest-Zip Wetsuit" → "Thermal Wetsuit") — the shortened version isn't the actual product name and won't verify against crawl data.
-- Include factual details: fabric types, fit styles (e.g., straight, scallop, regular), construction features. **Pull these verbatim from the PDP** ("4-way stretch", "GBS seams", "180g cotton"). Don't substitute generic descriptors like "cotton-rich" or "garment-washed" unless those exact phrases appear in the source PDP.
+- **Pick 2–3 attribute groups to go deep on, not 2–3 products.** A group is a set of products on the page that share something real: a fabric, a construction, a fit, a use case, a price tier. Each group gets 1–3 sentences with the differentiating detail pulled from the PDPs that back it. Don't sweep ten attributes with one adjective each — that reads like a spec sheet, not editorial copy.
+- **Group statements must be backed by every product they cover.** "Our hoodies are made from brushed fleece" needs every hoodie on the page to be brushed fleece. If only some are, scope it honestly ("several of the hoodies…", "the heavier hoodies…") or drop it. This is the same over-claim rule as always, and it does more work now that groups carry the whole piece.
+- **Quantify the group when the split is the point.** "Two of the tents include a rainfly" is more useful than "some include a rainfly," and it verifies cleanly. Counts of *variants sharing an attribute* are fine; counts of total products on the page are still banned (see the stale-data list).
+- **Proprietary material, fabric, and feature names are allowed** — trademarked mesh, fabric, and hardware names ("SkyWeave Mesh", "4-way stretch", "GBS seams") are the specificity that keeps general copy from going vague. Attribute them to the group, never to a named product. Ban applies to the product name itself, not to what the product is made of.
+- Include factual details: fabric types, fit styles (e.g., straight, scallop, regular), construction features. **Pull these verbatim from the PDP** ("4-way stretch", "GBS seams", "yarn-dyed stripe"). Don't substitute generic descriptors like "cotton-rich" or "garment-washed" unless those exact phrases appear in the source PDP. **Do not cite fabric weight** ("160g", "180g cotton", "6 oz") — see the stale-data list below.
 - Close with a real sentence, not a link list. A closing transition to a related category is fine, but carry it on prose with at most one inline link (see "Contextual linking is the default" below).
 
 **Contextual linking is the default — link on words the copy already uses.** The single most common linking failure is stacking every link into a closing "Browse X, Y, and Z" sentence. That reads as a footer nav dump, not editorial copy, and it wastes the anchor text: the words a shopper (and a search engine) care about — *boardshorts*, *swim*, *dresses*, *trucker hat*, *wetsuits* — are usually already sitting in the body, unlinked, while a generic "browse our range" carries the link at the bottom.
@@ -156,12 +166,12 @@ Only place a link in the closing sentence when a target has no natural anchor an
 
 **Worked example (a women's swim collection):**
 Before — links clustered in a closing dump:
-> ...The Sunset Cover-Up handles the walk back.
+> ...The cover-ups handle the walk back.
 > Pull the look together from <a>women's swim</a>, add breezy pieces from <a>women's dresses</a>, or carry it all in a tote from <a>women's bags and totes</a>.
 
 After — same three targets, moved onto words already in the copy, spread across the piece:
 > It runs across <a href="...collections/womens-swim">swim</a>, <a href="...collections/womens-dresses">dresses</a>, tops, pants, cover-ups, and accessories... *(paragraph 1)*
-> ...The Sunset Cover-Up handles the walk back, and a roomy <a href="...collections/womens-bags-totes">tote</a> carries the rest. *(closing prose, one inline link)*
+> ...The cover-ups handle the walk back, and a roomy <a href="...collections/womens-bags-totes">tote</a> carries the rest. *(closing prose, one inline link)*
 
 The closing sentence is now prose with at most one inline link, and every link sits on a word the reader was already reading.
 
@@ -179,7 +189,7 @@ The closing sentence is now prose with at most one inline link, and every link s
 
 - **Pairing logic that links a bottom-to-bottom or top-to-top as the "anchor."** When the copy describes a bottom (shorts, pants, jeans, skirt), don't follow up with "to anchor the look, pair with [other bottoms]." That makes no sense — bottoms anchor with tops. Same in reverse: when describing a top, don't suggest pairing with another top as the foundation. Suggested pairings should *complement*, not *duplicate*. Bad example:
 
-  > The Wanderer Woven Shorts pair with most printed tops in the season. Perfect for everyday activities like running errands and short walks to the water.
+  > The woven shorts pair with most printed tops in the season. Perfect for everyday activities like running errands and short walks to the water.
   >
   > To anchor the look with bottoms, pair with [women's pants](...).
 
@@ -189,8 +199,8 @@ The closing sentence is now prose with at most one inline link, and every link s
 
 - **"Kit" as a synonym for an apparel outfit.** Phrases like "build the kit" or "a coordinated kit" used to mean a clothing combination don't read naturally. People say *outfit*, *look*, *set*, or just describe the pieces. **Exception:** "kit" works for actual gear stacks where multiple equipment pieces combine for a function — e.g., a wetsuit kit (suit + boots + gloves + hood), a surf kit (boardshorts + rashguard + booties), a beach kit (towel + bag + sunscreen). For pairing tops with bottoms, drop "kit" and write "outfit" or "look" — or skip the wrapper word and just describe the pairing.
 
-  Bad: "The matching Sunliner cuts pair across tops and bottoms in the same prints, so the swim half builds easily into a coordinated kit."
-  Good: "The matching Sunliner tops and bottoms come in the same prints, so the swim pieces pair into a coordinated set."
+  Bad: "The matching cuts pair across tops and bottoms in the same prints, so the swim half builds easily into a coordinated kit."
+  Good: "The matching tops and bottoms come in the same prints, so the swim pieces pair into a coordinated set."
 
 - **Repeated sentence openers.** Don't begin consecutive sentences with the same word — especially "For" (the most common offender), but also "The," "Pair," "Browse," etc. Stacked "For X, see..." across two or three sentences in a row reads as a sitemap, not editorial copy. Vary the structure: lead one sentence with the product or use case, the next with the link target, the next with a closing thought. Bad example (three sentences in a row starting with "For"):
 
@@ -205,6 +215,8 @@ The closing sentence is now prose with at most one inline link, and every link s
 - **Prices and price ranges** — no dollar amounts anywhere in the copy. No price ranges, no "starting at" pricing, no "sits in the $35.95 range" (e.g., "$25.95 to $49.95", "prices from $22.95", "with markdowns taking some styles down to $28.97"). Prices change with sales, markdowns, and seasonal shifts. **Exception:** sale/clearance pages may use general price language like "full-price", "marked down", "markdowns", and "spending full price" — but still no specific dollar amounts.
 - **Size ranges and size availability** — never mention specific size ranges (e.g., "sizes XS to XL", "XXS through 2XL", "waist sizes 24 through 31", "available in sizes XS through M", "S/M, L/XL, and one-size across the range"). Size availability fluctuates by style and season, and stating it creates inaccuracy the moment stock changes.
 - **Length measurements** — no inseam, outseam, or inch measurements (e.g., "18-inch outseam", "15 to 21 inches"). Also avoid relative length language like "mid-length cut", "shorter fits to longer options", or "short enough / long enough". Fit *styles* (straight, scallop, regular, arch) are fine — those describe the cut shape, not the measurement.
+- **Fabric weight** — no gram or ounce weights ("160g", "180g cotton", "6 oz fleece", "220gsm"). Weight is a spec shoppers don't shop by and it reads as filler; name the fabric and construction instead ("100% cotton knit", "brushed fleece").
+- **Specific colorways** — don't name the color a product comes in (the trailing " - <Color>" in a PDP title, or "in Salt Crystal", "the Black colorway"). Colors are variants that sell out independently; name the style and speak broadly to the item. (Shade *stories* that describe a collection's palette in general — "washed neutrals", "bright summer prints" — are fine; a specific per-product color is not.)
 - Claims you can't verify from the crawl data (e.g., "all products have UPF 50" when only some do — use "many of our [product type]" instead)
 - Hype words, exclamation marks, ALL CAPS, emojis
 - Em dashes (— or —) used as sentence breaks or parenthetical asides. These create a rambling, stream-of-consciousness feel. Rewrite instead — split into two sentences or restructure so the thought flows naturally without the dash. Example: "There's something magical about slipping into your favorite hoodie — that instant feeling of warmth" should become "There's something magical about slipping into your favorite hoodie. That instant feeling of warmth is hard to beat."
@@ -228,8 +240,9 @@ If the brand guidelines specify a particular personality (e.g., "confident but u
 ### Step 5: Fact Check Against Crawl Data
 
 Compare every claim in the copy against what you found on the page:
-- Are the product names real? (Check against crawl data — verbatim, not shortened)
+- **Does the copy name any product?** It shouldn't. A product name is a finding on its own, whether or not it's accurate.
 - Are the fabric types and features accurate?
+- Does every group statement hold for every product it covers?
 - Does the page actually have the variety you're describing?
 - If you say "available in short and long sleeve", does the page actually show both?
 
@@ -247,17 +260,26 @@ Step 5 is your own read-back. Step 5b is an adversarial, automated loop that run
    ```bash
    python3 scripts/verify_claims.py corpus.json copy.json --output findings.json
    ```
-   It is vertical-agnostic: it extracts numeric specs, hyphenated descriptors, and acronyms from the copy and flags any that appear **nowhere** in that PLP's corpus, and marks any slug with no corpus as `NO_CORPUS`. No per-vertical setup is required; use `--patterns` only to add domain-specific multiword terms it can't infer (e.g. "GBS seams", "single origin"). See `scripts/patterns.example.txt`.
+   It is vertical-agnostic and runs two checks that point in opposite directions:
+   - `UNVERIFIED` — numeric specs, hyphenated descriptors, and acronyms in the copy that appear **nowhere** in that PLP's corpus.
+   - `NAMED_PRODUCTS` — corpus product names that **do** appear in the copy. Presence is the violation, so a perfect match still fails. Matched on the colorway-stripped style name, whole-phrase, so "Guardian™ DX Bug Net" and "Mantis UL" both catch.
+
+   It also marks any slug with no corpus as `NO_CORPUS`. No per-vertical setup is required; use `--patterns` only to add domain-specific multiword terms it can't infer (e.g. "GBS seams", "single origin"). See `scripts/patterns.example.txt`.
+
+   **Named products are a hard gate, not a candidate.** Unlike `UNVERIFIED` findings, which the validator prunes for false positives, a name match goes straight to the fixer. The only judgment call is whether the matched string is genuinely the product name or a common word that happens to collide with it.
 
 2. **Validator subagents (one per piece, in parallel).** Give each the piece's copy, its corpus (`names` + `text`), and the pre-pass findings for that slug. The validator confirms the script's findings and adds the semantic checks a regex can't make:
-   - **Product names** — every named product is a verbatim match (or clean sub/superstring) of a real corpus name. Shortened names are findings.
+   - **Named products (highest priority)** — scan the copy against the corpus `names` list. Any product, style, or SKU name that appears in the copy is a finding, *including* one that matches the corpus perfectly. Accuracy is not the test here; presence is. Watch for the near-misses a plain string match won't catch: a name with the colorway trimmed, a name split across a clause, or a style name reused as a common noun. Proprietary *material* and *feature* names are not product names and are not findings (see Step 3).
+   - **Named colorway / fabric weight** — a specific per-product color ("in Salt Crystal", a "- Black" suffix) or a fabric weight ("160g", "6 oz") in the copy is a finding: flag it for removal per Step 3.
    - **Over-claims** — "available in short and long sleeve" when only one exists; "all products have UPF 50" when only some do.
-   - **Sub-category sweeps** — "our hoodies are made of X" needs at least one hoodie PDP that backs it.
+   - **Group statements** — this is now the main event. "Our hoodies are made of X" needs **every** hoodie PDP to back it, not just one. A group claim backed by a subset is an over-claim, and it's the most likely way general copy goes wrong.
+   - **Group counts** — "two of the tents include a rainfly" must match the corpus count exactly.
    - **Empty inventory** — if the corpus has 0 usable products for this slug, flag the page itself; don't write around it.
-   Return structured findings: `{slug, unverified_claims, unverified_names, overclaims, notes, verdict: clean|issues}`.
+   Return structured findings: `{slug, unverified_claims, named_products, overclaims, notes, verdict: clean|issues}`.
 
 3. **Fixer subagents (only for pieces with findings).** Give each the copy, its findings, and its corpus. The fixer rewrites **only the flagged spans**:
-   - Replace a shortened name with the verbatim PDP name.
+   - **Rewrite a named product into its group.** Replace the name with the attribute that made it worth mentioning, scoped to every product that shares it: "The Tidewater Hybrid Short has a scalloped hem" → "The hybrid shorts here have scalloped hems." If the claim was true of that one product only, either widen it to a group the corpus supports or cut the sentence. Never swap one product name for another.
+   - Strip a per-product color mention or a fabric weight from the copy.
    - Replace a generic descriptor with the corpus's specific value ("cotton-rich" → "100% Cotton", **only if the PDP says so**).
    - Soften an over-claim to what's supported ("many of our [type]"), or cut it.
    - **Remove any claim the corpus cannot support. Never invent a replacement** — if it isn't in the corpus, it does not go in the copy. This is the universal fact-pass rule and it overrides any urge to keep a sentence pretty.
@@ -268,7 +290,7 @@ Step 5 is your own read-back. Step 5b is an adversarial, automated loop that run
 **Stop condition:** loop until a round produces **zero findings across all pieces two rounds in a row**, or after **3 rounds**, whichever comes first. If a piece still has findings after 3 rounds, stop fixing it and surface it in the output flags for human review — don't let the loop spin or the fixer get creative.
 
 **Output a per-piece audit line** into the tracking column ("Verifiability Audit") or a separate `audit_findings.json`:
-- Verified: `All N product names + M specific claims verified.`
+- Verified: `No named products. All N group claims + M specific claims verified.`
 - Resolved: `Fixed in K rounds: [what changed].`
 - Unresolved: `NEEDS REVIEW: [claim] — not supported by any PDP after 3 rounds.`
 - Inventory: `PLP HAS NO MATCHING INVENTORY: [explanation].`
@@ -277,7 +299,8 @@ Step 5 is your own read-back. Step 5b is an adversarial, automated loop that run
 **What a finding tells you:**
 - `cotton-rich` / `cotton-blend` flagged → generic descriptor instead of the PDP's exact composition. Use the verbatim composition ("100% Cotton", "98% Cotton, 2% Elastane").
 - `garment-washed` flagged on a piece → extrapolated from a sibling PDP. State it only if this product's PDP says so.
-- Shortened product name flagged → use the verbatim PDP H1.
+- Product name flagged → rewrite it as the attribute group it belonged to. Don't substitute a different name.
+- Group claim flagged → the corpus backs it for some products but not all. Narrow the scope or cut it.
 - `NO_CORPUS` → the page was crawled names-only, or the PDP crawl failed. Either crawl its PDPs or keep the copy free of per-product claims.
 
 ### Step 5c: Link Placement QA Loop (detect → fix → re-check)
@@ -306,7 +329,7 @@ Step 5b guards *what* the copy claims. Step 5c guards *how it links*. Writers �
    - **missed inline opportunities** — does the body already contain a category noun (unlinked) that matches a link target sitting in the closing dump? That's the exact fix: move the link onto the word.
    Return: `{slug, verdict: clean|issues, closing_dump: bool, generic_anchors: [...], move_suggestions: [{target, from:"closing", to:"the word '<x>' in paragraph N"}], notes}`.
 
-3. **Fixer subagents (only for pieces with findings).** Give each the copy, its findings, and the target list. The fixer **repositions links only** — it must not touch product names, features, or any factual claim (those already passed 5b):
+3. **Fixer subagents (only for pieces with findings).** Give each the copy, its findings, and the target list. The fixer **repositions links only** — it must not touch group statements, features, or any factual claim (those already passed 5b):
    - Move a dumped link onto the naturally-occurring word the QA agent identified.
    - Rewrite a closing "Browse X, Y, and Z" sentence into prose, relocating its links inline earlier; if that strands the closing sentence, give it a short real closing line (subject + finite verb, no fragment).
    - Replace a generic anchor with the category phrase it points to.
